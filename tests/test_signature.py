@@ -1,33 +1,23 @@
 """
 Standalone signature-verification harness for the TP-Link Archer AX72 login bug.
 
-Purpose: test *hash* + *chunking* hypotheses against a real, captured browser
-login without touching tplinkrouterc6u or the project code. Fill in CAPTURE
-below with values pulled from a fresh DevTools capture of a real (cold)
-login, then run this file.
+Purpose: test *hash* + *chunking* hypotheses against a real, captured browser login without touching tplinkrouterc6u or the project code.
+Fill in CAPTURE below with values pulled from a fresh DevTools capture of a real (cold) login, then run this file.
 
-Confirmed this session (see project recap): the device signs with RSA-OAEP,
-not classic PKCS1v1.5, despite tplinkrouterc6u's SIGNATURE_OFFSET=53 constant
-being sized for PKCS1v1.5. Message format:
-    k=<AES key>&i=<AES iv>&h=<SHA-256 hex of username+password>&s=<seq+cipherLen>
+Confirmed this session (see project recap): the device signs with RSA-OAEP, not classic PKCS1v1.5,
+despite tplinkrouterc6u's SIGNATURE_OFFSET=53 constant being sized for PKCS1v1.5.
+Message format: k=<AES key>&i=<AES iv>&h=<SHA-256 hex of username+password>&s=<seq+cipherLen>
 Chunking is nested:
-  1. Split the full message into 53-char outer pieces (last may be shorter) -
-     this is the protocol-level convention, shared with tplinkrouterc6u's own
-     EncryptionWrapper (common/encryption.py) and TplinkRouterSG
-     (client/sg.py), both PKCS1v1.5-only. NOTE: TplinkRouterSG's own
-     _build_login_signature has the same bug this script used to have - it
-     OAEP-encrypts each 53-char piece directly, without the inner split
-     below, so it likely 403s on OAEP devices too.
-  2. Under OAEP, each outer piece is split *again* into RSA-OAEP's true max
-     input size: modulus_bytes - 2*hash_len_bytes - 2 (SHA-1 -> 20 bytes).
-     For a 512-bit/64-byte modulus that's 64 - 40 - 2 = 22 bytes, e.g. a
-     53-byte piece becomes 22 + 22 + 9. Each sub-piece is RSA-encrypted
-     individually - that's the real, atomic RSA operation - and every
-     resulting hex block is concatenated in order to form the final `sign`.
-  3. If the device instead uses classic PKCS1v1.5 (no OAEP), step 2 is
-     skipped: each 53-byte piece is RSA-encrypted directly, one block per
-     piece - reusing tplinkrouterc6u's own EncryptionWrapper.rsa_encrypt for
-     that branch since PKCS1v1.5 chunking really is a solved problem there.
+  1. Split the full message into 53-char outer pieces (last may be shorter) -this is the protocol-level convention,
+     shared with tplinkrouterc6u's own EncryptionWrapper (common/encryption.py) and TplinkRouterSG (client/sg.py), both PKCS1v1.5-only.
+     NOTE: TplinkRouterSG's own _build_login_signature has the same bug this script used to have - it OAEP-encrypts each 53-char piece directly,
+     without the inner split below, so it likely 403s on OAEP devices too.
+  2. Under OAEP, each outer piece is split *again* into RSA-OAEP's true max input size: modulus_bytes - 2*hash_len_bytes - 2 (SHA-1 -> 20 bytes).
+     For a 512-bit/64-byte modulus that's 64 - 40 - 2 = 22 bytes, e.g. a 53-byte piece becomes 22 + 22 + 9.
+     Each sub-piece is RSA-encrypted individually - that's the real,
+     atomic RSA operation - and every resulting hex block is concatenated in order to form the final `sign`.
+  3. If the device instead uses classic PKCS1v1.5 (no OAEP), step 2 is skipped: each 53-byte piece is RSA-encrypted directly,
+     one block per piece - reusing tplinkrouterc6u's own EncryptionWrapper.rsa_encrypt for that branch since PKCS1v1.5 chunking really is a solved problem there.
 """
 from hashlib import md5, sha256
 from binascii import hexlify
@@ -41,7 +31,7 @@ CAPTURE = {
     "password": "",                # the real router password
     "nn": "",
     "ee": "",
-    "seq": "",              # from this session's /login?form=auth # 283809079
+    "seq": "",              # from this session's /login?form=auth
     "aes_key": "",                 # 16-digit AES key from the real request (see note below)
     "aes_iv": "",                  # 16-digit AES iv, same source
     "real_sign": "",               # the actual 'sign' field from the captured POST body
@@ -95,10 +85,8 @@ def try_hash(label: str, hash_value: str, cap: dict) -> None:
         return
 
     data_len = len(cap["real_data"]) if cap["real_data"] else 0
-    # s = seq + data_len is a numeric sum (see TplinkRouterSG._build_login_signature
-    # and CVE-2022-30075's tplink.py: `self.seq + len(encrypted_data)`), NOT string
-    # concatenation - concatenating here silently produces a wrong-but-plausible s
-    # value instead of erroring, which is what made seq look inconsistent.
+    # s = seq + data_len is a numeric sum (see TplinkRouterSG._build_login_signature and CVE-2022-30075's tplink.py: `self.seq + len(encrypted_data)`),
+    # NOT string concatenation - concatenating here silently produces a wrong-but-plausible s value instead of erroring, which is what made seq look inconsistent.
     seq_plus_len = str(int(cap["seq"]) + data_len)
     message = 'k={}&i={}&h={}&s={}'.format(
         cap["aes_key"], cap["aes_iv"], hash_value, seq_plus_len)
