@@ -212,3 +212,9 @@ auditlogger/config/config.yaml
 
 # Local agent workspace metadata.
 .agents/
+
+# Logs for safety check for Safety
+.*.ini
+
+# Security checks guide
+Security Audit Guide.md
