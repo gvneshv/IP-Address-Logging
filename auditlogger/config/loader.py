@@ -7,6 +7,22 @@ from typing import Any
 
 DEFAULT_CONFIG_PATH = Path(__file__).with_name("config.yaml")
 
+# section -> required keys directly inside it.
+# An empty tuple means the section itself must exist (even empty/disabled), but no specific key inside it is required.
+_REQUIRED_SECTIONS: dict[str, tuple[str, ...]] = {
+    "storage": ("log_file",),
+    "telegram": (),
+    "router": (),
+}
+
+
+class ConfigError(Exception):
+    """Raised for problems with the AuditLogger config file - missing file, missing required sections, or malformed YAML.
+    Deliberately a plain Exception subclass (not FileNotFoundError/ValueError/etc.)
+    so callers can catch exactly this and only this to show a clean message instead of a traceback;
+    anything else raised while loading config most likely indicates a real bug and should still surface normally.
+    """
+
 
 def _parse_scalar(value: str) -> Any:
     """Parse the scalar values supported by the fallback YAML loader."""
@@ -70,13 +86,50 @@ def _load_simple_yaml(text: str) -> dict[str, Any]:
     return root
 
 
+def _validate_config(config: Any, path: Path) -> dict[str, Any]:
+    """Raise ConfigError listing every missing/invalid required section at once.
+
+    Checking eagerly here (once, right after loading) means a misconfigured file fails immediately and predictably at startup,
+    rather than intermittently deep inside run_once() - e.g. the "telegram" section is only ever subscripted when a notifiable change actually occurs,
+    so a missing key there could otherwise pass silently for weeks until the first real WAN change triggered a raw KeyError mid-run.
+    """
+    if not isinstance(config, dict):
+        raise ConfigError(
+            f"Config file at {path} must be a YAML mapping of sections (got {type(config).__name__})."
+        )
+
+    problems: list[str] = []
+    for section, required_keys in _REQUIRED_SECTIONS.items():
+        section_value = config.get(section)
+        if not isinstance(section_value, dict):
+            problems.append(f"missing or invalid '{section}' section")
+            continue
+        for key in required_keys:
+            if key not in section_value:
+                problems.append(f"missing '{section}.{key}'")
+
+    if problems:
+        example = path.with_name("config.example.yaml")
+        raise ConfigError(
+            f"Config file at {path} is incomplete: {'; '.join(problems)}. "
+            f"Check {example.name} for the expected shape."
+        )
+
+    return config
+
+
 def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
-    """Load configuration from config_path or the package config.yaml file."""
+    """Load configuration from config_path or the package config.yaml file.
+
+    Raises ConfigError - never a bare FileNotFoundError, KeyError, or yaml.YAMLError - for every way this can fail:
+    no file, a file that isn't valid YAML, or valid YAML that's missing a section main.py depends on.
+    Callers (main.py) catch ConfigError specifically to print a short message instead of a traceback.
+    """
     path = Path(config_path) if config_path else DEFAULT_CONFIG_PATH
 
     if not path.exists():
         example = path.with_name("config.example.yaml")
-        raise FileNotFoundError(
+        raise ConfigError(
             f"Config file not found: {path}. Copy {example.name} to {path.name} and adjust values."
         )
 
@@ -85,6 +138,11 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
     try:
         import yaml
     except ModuleNotFoundError:
-        return _load_simple_yaml(text)
+        config = _load_simple_yaml(text)
+    else:
+        try:
+            config = yaml.safe_load(text) or {}
+        except yaml.YAMLError as error:
+            raise ConfigError(f"Config file at {path} is not valid YAML: {error}") from error
 
-    return yaml.safe_load(text) or {}
+    return _validate_config(config, path)

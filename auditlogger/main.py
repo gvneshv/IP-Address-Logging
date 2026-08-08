@@ -1,12 +1,13 @@
 """Application entry points for collecting and writing one audit event."""
 
 from __future__ import annotations
+import sys
 from pathlib import Path
 
 from auditlogger.collector.network import collect_network_info
 from auditlogger.collector.system import collect_system_info
 from auditlogger.collector.timecheck import local_now_iso, utc_now_iso
-from auditlogger.config.loader import load_config
+from auditlogger.config.loader import ConfigError, load_config
 from auditlogger.logging_config import configure_logging
 from auditlogger.notifications.telegram import TelegramNotifier
 from auditlogger.storage.hashchain import build_hashed_event
@@ -120,15 +121,25 @@ def run_once(config_path: str | Path | None = None) -> dict:
 
 
 def main() -> None:
-    """Run the command-line entry point and print the stored event hash and capabilities."""
-    hashed_event = run_once()
-    print(f"Audit event written: {hashed_event['hash']}")
+    """Run the command-line entry point and print the stored event hash and capabilities.
 
-    config = load_config()
-    capabilities = detect_capabilities(config, hashed_event["event"]["network"])
-    print("Detected capabilities:")
-    for label, value in capabilities.items():
-        print(f"  {label}: {value}")
+    Configuration problems (missing config file, missing required sections, invalid YAML)
+    are caught here and reported as a one-line message on stderr instead of a full traceback - for the person running this,
+    a bad config is a setup step to fix, not a bug to debug.
+    Any other exception still propagates normally, since it likely does indicate a real bug worth seeing the traceback for.
+    """
+    try:
+        hashed_event = run_once()
+        print(f"Audit event written: {hashed_event['hash']}")
+
+        config = load_config()
+        capabilities = detect_capabilities(config, hashed_event["event"]["network"])
+        print("Detected capabilities:")
+        for label, value in capabilities.items():
+            print(f"  {label}: {value}")
+    except ConfigError as error:
+        print(f"AuditLogger configuration error: {error}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
