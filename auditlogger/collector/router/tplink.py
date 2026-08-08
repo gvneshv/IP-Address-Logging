@@ -27,10 +27,17 @@ logger = logging.getLogger(__name__)
 
 
 class TplinkProvider(RouterProvider):
-    """Collects WAN IP, gateway, and DNS info from a TP-Link router's admin panel."""
+    """Collects WAN IP, gateway, DNS, firmware, uptime, and client-count info from a TP-Link router's admin panel."""
 
-    def __init__(self, connection: RouterConnection) -> None:
+    def __init__(self, connection: RouterConnection, include_device_list: bool = False) -> None:
+        """include_device_list gates the per-device MAC/hostname/IP list behind an explicit opt-in.
+
+        Aggregate client counts (clients_total, wired_total, etc.) are collected unconditionally - they carry no per-device identity.
+        The raw device list does (MAC address + hostname per connected device), so unlike every other field this provider collects,
+        it's disabled by default even when the router is enabled.
+        """
         self._connection = connection
+        self._include_device_list = include_device_list
 
     def _get_authorized_client(self):
         """Return an already-authorized router client, trying the confirmed AX72 fix first.
@@ -65,8 +72,30 @@ class TplinkProvider(RouterProvider):
         router.authorize()
         return router
 
+    @staticmethod
+    def _serialize_devices(devices: list) -> list[dict[str, Any]]:
+        """Convert tplinkrouterc6u Device objects into JSON-serializable dicts.
+
+        Only the fields relevant to an identity/audit log are kept (hostname, MAC, IP, connection type, active) -
+        per-device throughput/signal stats aren't audit-relevant and would just bloat the log.
+        """
+        return [
+            {
+                "hostname": device.hostname,
+                "mac": device.macaddr,
+                "ip": device.ipaddr,
+                "connection_type": device.type.value,
+                "active": device.active,
+            }
+            for device in devices
+        ]
+
     def collect(self) -> dict[str, Any]:
-        """Return WAN/gateway/DNS info, or {} if the router can't be reached.
+        """Return WAN/gateway/DNS/firmware/uptime/client-count info, or {} if the router can't be reached.
+
+        Makes three authenticated calls per run (get_ipv4_status, get_status, get_firmware) plus the login/logout pair
+        - more router round-trips than the original WAN-only version, but all three share one authorized session,
+        so this is still a single authorize()/logout() cycle, not three.
 
         Any auth, network, or library error here is logged and swallowed rather than raised:
         per docs/architecture.md, collectors must fail independently without breaking the rest of the audit snapshot.
@@ -75,19 +104,31 @@ class TplinkProvider(RouterProvider):
         router = None
         try:
             router = self._get_authorized_client()
-            status = router.get_ipv4_status()
+            ipv4_status = router.get_ipv4_status()
+            status = router.get_status()
+            firmware = router.get_firmware()
         except Exception as error:
             logger.warning(
                 "TP-Link router collection failed (%s): %s", self._connection.address, error
             )
             return {}
         else:
-            return {
-                "wan_ip": status.wan_ipv4_ipaddr,
-                "gateway": status.wan_ipv4_gateway,
-                "dns_primary": status.wan_ipv4_pridns,
-                "dns_secondary": status.wan_ipv4_snddns,
+            result = {
+                "wan_ip": ipv4_status.wan_ipv4_ipaddr,
+                "wan_mac": ipv4_status.wan_macaddr,
+                "conn_type": ipv4_status.wan_ipv4_conntype,
+                "gateway": ipv4_status.wan_ipv4_gateway,
+                "dns_primary": ipv4_status.wan_ipv4_pridns,
+                "dns_secondary": ipv4_status.wan_ipv4_snddns,
+                "wan_uptime_seconds": status.wan_ipv4_uptime,
+                "firmware_version": firmware.firmware_version,
+                "hardware_version": firmware.hardware_version,
+                "model": firmware.model,
+                "connected_clients_total": status.clients_total,
             }
+            if self._include_device_list:
+                result["devices"] = self._serialize_devices(status.devices)
+            return result
         finally:
             if router is not None:
                 try:
