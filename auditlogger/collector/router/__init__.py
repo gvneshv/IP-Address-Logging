@@ -33,7 +33,10 @@ def _select_provider(router_config: dict[str, Any]):
 
     match detection_type:
         case "tplink":
-            return TplinkProvider(_build_connection(router_config))
+            return TplinkProvider(
+                _build_connection(router_config),
+                include_device_list=bool(router_config.get("include_device_list", False)),
+            )
         case "auto":
             return AutoDetectionProvider()
         case _:

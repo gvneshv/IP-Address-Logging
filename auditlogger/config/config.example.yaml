@@ -8,11 +8,20 @@ telegram:
   bot_token: ""
   chat_id: ""
 
+notifications:
+  notify_on:
+    wan_change: true          # default - WAN reconnects/lease renewals more often than the external IP itself
+    external_ip_change: false
+    conn_type_change: false   # static vs dynamic WAN connection type
+    wan_mac_change: false
+    dns_change: false         # either DNS server changing
+
 scheduler:
   windows_startup_task_name: AuditLogger
 
 router:
   enabled: true
+  include_device_list: false  # per-device MAC/hostname/IP for every connected client - off by default (privacy)
   connection:
     address: "http://192.168.0.1"   # your router's actual admin URL
     username: "admin"
