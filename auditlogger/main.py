@@ -30,24 +30,45 @@ def _detect_notifiable_changes(
 ) -> list[tuple[str, str, str]]:
     """Return (label, previous_value, current_value) for changes enabled in config.
 
-    Each trigger defaults to enabled when notifications_config["notify_on"] omits it, preserving the pre-existing external-IP-only notification behaviour.
+    wan_change is the only trigger enabled by default when notifications_config["notify_on"] omits it - the WAN interface
+    (reconnects, lease renewals, PPPoE re-auth) changes far more often than the external IP a router happens to be assigned, so it's the more useful default signal.Every other trigger (external_ip_change, conn_type_change, wan_mac_change, dns_change) defaults to disabled and must be explicitly opted into.
     A change only counts when both a previous and current value exist and differ - a field appearing for the first time
     (e.g. router data starting to populate once a real provider lands) is not treated as a "change".
     """
     notify_on = notifications_config.get("notify_on", {})
+    previous_router = previous_network.get("router", {})
+    current_router = current_network.get("router", {})
     changes: list[tuple[str, str, str]] = []
 
-    if notify_on.get("external_ip_change", True):
+    if notify_on.get("wan_change", True):
+        previous_wan = previous_router.get("wan_ip")
+        current_wan = current_router.get("wan_ip")
+        if previous_wan and current_wan and previous_wan != current_wan:
+            changes.append(("wan_ip", previous_wan, current_wan))
+
+    if notify_on.get("external_ip_change", False):
         previous_ip = previous_network.get("external_ip")
         current_ip = current_network.get("external_ip")
         if previous_ip and current_ip and previous_ip != current_ip:
             changes.append(("external_ip", previous_ip, current_ip))
 
-    if notify_on.get("wan_change", True):
-        previous_wan = previous_network.get("router", {}).get("wan_ip")
-        current_wan = current_network.get("router", {}).get("wan_ip")
-        if previous_wan and current_wan and previous_wan != current_wan:
-            changes.append(("wan_ip", previous_wan, current_wan))
+    if notify_on.get("conn_type_change", False):
+        previous_conn_type = previous_router.get("conn_type")
+        current_conn_type = current_router.get("conn_type")
+        if previous_conn_type and current_conn_type and previous_conn_type != current_conn_type:
+            changes.append(("conn_type", previous_conn_type, current_conn_type))
+
+    if notify_on.get("wan_mac_change", False):
+        previous_mac = previous_router.get("wan_mac")
+        current_mac = current_router.get("wan_mac")
+        if previous_mac and current_mac and previous_mac != current_mac:
+            changes.append(("wan_mac", previous_mac, current_mac))
+
+    if notify_on.get("dns_change", False):
+        previous_dns = (previous_router.get("dns_primary"), previous_router.get("dns_secondary"))
+        current_dns = (current_router.get("dns_primary"), current_router.get("dns_secondary"))
+        if all(previous_dns) and all(current_dns) and previous_dns != current_dns:
+            changes.append(("dns", ",".join(previous_dns), ",".join(current_dns)))
 
     return changes
 
