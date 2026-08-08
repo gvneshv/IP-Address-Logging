@@ -12,16 +12,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Added a router orchestrator (`collect_router_info`) that selects a provider from `config["router"]["detection"]["type"]` and delegates collection to it.
 - Added an optional `network.router` field to audit events, populated only when the router collector returns data.
 - Added regression tests for the router orchestrator and for the config loader's nested-section parsing.
-- Added `tests/test_signature.py` (offline RSA/AES chunking-and-hash math checker) and `tests/live_login_test.py` (live end-to-end login smoke test against a real router). Both are manual/opt-in - they need real captured or live credentials filled in and are not part of the automated suite - kept for diagnosing future firmware or protocol changes. See the module docstring in each for usage.
+- Added `tests/test_signature.py` (offline RSA/AES chunking-and-hash math checker), `tests/live_login_test.py` (live end-to-end login smoke test), and `tests/live_status_test.py` (live end-to-end status-field smoke test) against a real router. All three are manual/opt-in - they need real captured or live credentials filled in and are not part of the automated suite - kept for diagnosing future firmware or protocol changes. See the module docstring in each for usage.
+- Added `tests/test_capabilities.py` and `tests/test_notification_triggers.py`, covering `detect_capabilities()` and `_detect_notifiable_changes()` respectively.
+- Added firmware version/model/hardware version, WAN uptime, and aggregate connected-client count to `TplinkProvider.collect()`'s return value, via new `get_firmware()` and `get_status()` calls made in the same authorized session as the existing `get_ipv4_status()` call.
+- Added an opt-in `router.include_device_list` config flag. When true, `TplinkProvider.collect()` also returns a `devices` list (hostname, MAC, IP, connection type, active) for every client currently connected to the router. Defaults to false - unlike every other field this provider collects, a per-device list identifies specific devices on the network, not just the router's own state.
 
 ### Fixed
 
-- Fixed TP-Link login always failing with 403 on the Archer AX72: `TplinkProvider` depended entirely on upstream `tplinkrouterc6u`'s auto-detection, whose client classes all assume RSA-PKCS1v1.5 signing. The AX72's firmware actually signs login requests with nested RSA-OAEP chunking (53-char outer split, then a further OAEP-max-size inner split - see `tplink_ax72.py` for the full derivation and confirmed protocol details), which no upstream class implements. Added `TplinkRouterAX72`, tried first via a real `authorize()` attempt in `TplinkProvider`, falling back to upstream auto-detection for any other TP-Link router. Confirmed against a real device with `tests/live_login_test.py` (successful `stok` + `sysauth` session, twice, with two different credential sets).
+- Fixed TP-Link login always failing with 403 on the Archer AX72: `TplinkProvider` depended entirely on upstream `tplinkrouterc6u`'s auto-detection, whose client classes all assume RSA-PKCS1v1.5 signing. The AX72's firmware actually signs login requests with nested RSA-OAEP chunking (53-char outer split, then a further OAEP-max-size inner split - see `tplink_ax72.py` for the full derivation and confirmed protocol details), which no upstream class implements. Added `TplinkRouterAX72`, tried first via a real `authorize()` attempt in `TplinkProvider`, falling back to upstream auto-detection for any other TP-Link router. Confirmed against a real device with `tests/live_login_test.py` (successful `stok` + `sysauth` session, twice, with two different credential sets) and `tests/live_status_test.py` (confirmed real WAN IP/gateway/DNS returned correctly through the full `authorize() -> get_ipv4_status() -> logout()` flow).
 
 ### Changed
 
 - Changed the fallback YAML parser in `config/loader.py` to support arbitrary nesting depth, required by the new `router.connection.*` config fields.
 - Renamed `collect_network_info`'s parameter from `config` to `router_config` for clarity (it only ever received the router section).
+- Changed the default notification trigger from `external_ip_change` to `wan_change`: the router's WAN interface reconnects, renews its DHCP lease, or re-authenticates far more often than the public IP itself changes, so `wan_change` is now the only `notify_on` trigger enabled by default. `external_ip_change` is still supported but now opt-in.
+- Added `conn_type_change`, `wan_mac_change`, and `dns_change` as opt-in `notify_on` triggers, backed by new fields (`conn_type`, `wan_mac`) added to `TplinkProvider.collect()`'s return value alongside the existing `wan_ip`, `gateway`, `dns_primary`, and `dns_secondary`.
+- Declared `pycryptodome` as a direct dependency in `pyproject.toml`. `tplink_ax72.py` imports it directly (`Crypto.Cipher`, `Crypto.PublicKey.RSA`); it was previously only present transitively via `tplinkrouterc6u`, which isn't a guarantee upstream will keep it that way.
 
 ### Security
 
@@ -30,7 +36,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Known Limitations
 
 - `AutoDetectionProvider` is a stub and returns no data yet; WAN/DNS/gateway collection is still pending (Phase 2 of `docs/refactoring-roadmap.md`).
-- `TplinkProvider`'s login/authorize path is now confirmed working against a real AX72, but `get_ipv4_status()`'s WAN IP/gateway/DNS field mapping has not yet been verified against live router output - that verification is the next step before this can be considered a complete fix.
 
 ## [1.0.0] - 2026-06-25
 
