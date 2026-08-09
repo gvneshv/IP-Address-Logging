@@ -40,6 +40,8 @@ Copy-Item .\auditlogger\config\config.example.yaml .\auditlogger\config\config.y
 
 Edit `auditlogger/config/config.yaml`.
 
+Running without a config file, or with one missing a required section (`storage`, `telegram`, or `router`), prints a short error explaining what's missing and exits - it won't crash with a full traceback.
+
 For logging only:
 
 ```yaml

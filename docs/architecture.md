@@ -107,6 +107,8 @@ Responsibilities:
 
 Configuration should not contain business logic.
 
+Configuration errors are a setup problem for the person running the tool, not a bug - they should be reported as a short, specific message (what's missing, where to fix it) and the process should exit cleanly, never with a raw traceback. `auditlogger/config/loader.py`'s `ConfigError` is the single type used for this: a missing config file, invalid YAML, and a config missing a section the application depends on all raise it, and it's validated once, eagerly, right after loading - not discovered piecemeal wherever a section happens to first get subscripted. `main.py`'s CLI entry point is the only place that catches it.
+
 ---
 
 ## Data Sources
@@ -219,6 +221,7 @@ Router-specific implementations should remain isolated under their own package, 
     client.py      # RouterClient - shared HTTP session handling (requests-based)
     detection.py  # AutoDetectionProvider - fallback default, returns {} (not yet implemented)
     tplink.py     # TplinkProvider - wraps the tplinkrouterc6u library
+    tplink_ax72.py # TplinkRouterAX72 - firmware-specific signature-scheme override for tplink.py
     __init__.py   # collect_router_info() - orchestrator; selects a provider from
                   #   config["router"]["detection"]["type"] and delegates to it
     mikrotik.py   # future vendor providers follow the same RouterProvider interface
