@@ -109,7 +109,10 @@ class TplinkProvider(RouterProvider):
             firmware = router.get_firmware()
         except Exception as error:
             logger.warning(
-                "TP-Link router collection failed (%s): %s", self._connection.address, error
+                "TP-Link router collection failed (%s): %s | This usually means an incorrect router "
+                "username/password, or the router being unreachable at this address - double-check "
+                "router.connection.address/username/password in your config.",
+                self._connection.address, error,
             )
             return {}
         else:
