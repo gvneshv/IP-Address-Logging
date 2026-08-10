@@ -117,18 +117,20 @@ Each log entry contains:
 
 ## Windows Startup Task
 
-AuditLogger includes a helper for creating a Windows Task Scheduler task that runs at user logon.
+AuditLogger includes a helper for creating a Windows Task Scheduler task that runs at your logon specifically (not any user's logon on the machine).
 
-From the project root:
+**Run this from an elevated (Administrator) terminal.** Setting an explicit run-as user (`/RU`), even for your own account, requires elevation on Windows - a non-elevated prompt fails with `ERROR: Access is denied.` This is a one-time setup step; the task itself runs later without needing elevation.
+
+From the project root, in an elevated PowerShell:
 
 ```powershell
 python -c "from auditlogger.scheduler.tasks import create_windows_startup_task; r = create_windows_startup_task(); print(r.returncode); print(r.stdout); print(r.stderr)"
 ```
 
-Verify the task:
+`returncode` should be `0`. Verify the task:
 
 ```powershell
-schtasks /Query /TN AuditLogger
+schtasks /Query /TN AuditLogger /V /FO LIST
 ```
 
 The task runs:

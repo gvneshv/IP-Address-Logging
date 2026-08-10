@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Changed `TplinkProvider`'s collection-failure log message to include a one-line hint (likely cause: wrong credentials or an unreachable admin panel) alongside the raw underlying error, instead of only the raw error text - the underlying error text alone (e.g. `tplinkrouterc6u`'s JSON-parse error on an empty response) isn't actionable without already knowing what usually causes it.
 - Fixed `scheduler/tasks.py`'s startup task: the scheduled action now runs via `cmd.exe /c cd /d "<project_root>" && ...` instead of invoking python directly. Task Scheduler's default "start in" folder for a bare executable target is the executable's own directory, not this project - relative paths like `storage.log_file` in `config.example.yaml` would otherwise resolve against the wrong working directory on a real logon-triggered run.
 - Fixed `scheduler/tasks.py`'s trigger scope: `/SC ONLOGON` without `/RU <user>` fires on *any* user's logon to the machine, not just the one installing it. Now sets `/RU` to the current user explicitly.
+- Confirmed the startup task end-to-end on a real machine: creation requires an elevated (Administrator) terminal (explicit `/RU` needs admin rights on Windows, even for the current user - a non-elevated attempt fails with `ERROR: Access is denied.`), and after that, a real logon-triggered run correctly creates `logs/` under the project root rather than under the Python install directory. README updated with the elevation requirement.
 
 ### Security
 
