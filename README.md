@@ -60,6 +60,14 @@ telegram:
   chat_id: "YOUR_CHAT_ID"
 ```
 
+`bot_token` identifies *which bot* sends the message - get it from [@BotFather](https://t.me/BotFather) (`/mybots` -> your bot -> API Token).
+
+`chat_id` identifies *where* it sends - the chat the bot posts into, **not the bot's own ID**. For a private DM with your own bot (the common case), that's *your* numeric Telegram user ID:
+
+1. Open a chat with your bot and send it any message (e.g. "hi") - a bot can't message you first
+2. Open `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates` in a browser (the word `bot` stays literally in the URL, immediately followed by your token - no other text in between)
+3. Find `"chat":{"id": ...}` in the response - that number is your `chat_id`
+
 For email notifications, defaults to STARTTLS on port 587 (works with Gmail, Outlook, and most self-hosted mail servers out of the box):
 
 ```yaml
@@ -163,7 +171,7 @@ Current behavior is one run per logon. AuditLogger does not run as a continuous 
 schtasks /Delete /TN AuditLogger /F
 ```
 
-Or via the GUI: **Task Scheduler → Task Scheduler Library → right-click "AuditLogger" → Delete**.
+Or via the GUI: **Task Scheduler -> Task Scheduler Library -> right-click "AuditLogger" -> Delete**.
 
 ## Project Layout
 

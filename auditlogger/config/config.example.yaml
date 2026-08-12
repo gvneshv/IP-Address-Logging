@@ -6,7 +6,8 @@ storage:
 telegram:
   enabled: false
   bot_token: ""
-  chat_id: ""
+  chat_id: ""  # the chat the bot posts INTO - for a private DM with your own bot, this is YOUR numeric Telegram user ID, not the bot's.
+               # See README for how to find it.
 
 email:
   enabled: false
