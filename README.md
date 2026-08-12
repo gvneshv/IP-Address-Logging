@@ -13,7 +13,7 @@ AuditLogger is a Windows-focused Python audit utility that records network and s
 - Writes newline-delimited JSON logs
 - Adds SHA256 hashes to each stored event
 - Links each event to the previous event hash
-- Sends Telegram notifications on configurable triggers (WAN change by default; external IP, WAN connection type, WAN MAC, and DNS changes are opt-in) - see Configuration below
+- Sends Telegram and/or email notifications on configurable triggers (WAN change by default; external IP, WAN connection type, WAN MAC, and DNS changes are opt-in) - see Configuration below
 - Router/WAN data collection via the TP-Link admin panel: WAN IP, WAN MAC, connection type (static/dynamic), gateway, primary/secondary DNS, WAN uptime, firmware/hardware version and model, and connected-client count
 - Optional per-device list (MAC/hostname/IP of every connected client) - off by default, since it's more identifying data than the rest of what this tool collects; see Configuration below
 
@@ -22,7 +22,7 @@ AuditLogger is a Windows-focused Python audit utility that records network and s
 - Windows
 - Python 3.11 or newer
 - [`requests`](https://pypi.org/project/requests/) (used by the router HTTP client for router admin-panel communication)
-- Optional: Telegram bot token and chat ID for notifications
+- Optional: Telegram bot token and chat ID, and/or SMTP credentials, for notifications
 
 ## Installation
 
@@ -59,6 +59,22 @@ telegram:
   bot_token: "YOUR_BOT_TOKEN"
   chat_id: "YOUR_CHAT_ID"
 ```
+
+For email notifications, defaults to STARTTLS on port 587 (works with Gmail, Outlook, and most self-hosted mail servers out of the box):
+
+```yaml
+email:
+  enabled: true
+  smtp_host: "smtp.example.com"
+  smtp_port: 587
+  smtp_use_ssl: false  # true for implicit TLS, typically port 465
+  username: "you@example.com"
+  password: "YOUR_SMTP_PASSWORD"
+  from_address: "you@example.com"
+  to_address: "you@example.com"
+```
+
+Telegram and email are independent - enable either, both, or neither. Both fire on the same triggers (see below).
 
 ### Notification triggers
 
@@ -170,7 +186,7 @@ IP Address Logging/
 │     │   └── loader.py       # Config loading with a small YAML fallback
 │     ├── notifications/
 │     │   ├── telegram.py     # Telegram Bot API client
-│     │   └── email.py        # Future email notification placeholder
+│     │   └── email.py        # EmailNotifier - SMTP email client
 │     ├── scheduler/
 │     │   └── tasks.py        # Windows Task Scheduler helper
 │     ├── storage/
@@ -186,6 +202,7 @@ IP Address Logging/
 ├── tests/
 │     ├── live_status_test.py
 │     ├── test_capabilities.py
+│     ├── test_email.py
 │     ├── test_notification_triggers.py
 │     ├── test_event.py
 │     ├── test_loader.py
@@ -219,7 +236,7 @@ The repository ignores local runtime data by default:
 - `.agents/`
 - Python caches
 
-Do not commit real Telegram tokens, chat IDs, or production audit logs.
+Do not commit real Telegram tokens, chat IDs, SMTP credentials, or production audit logs.
 
 ## Roadmap
 

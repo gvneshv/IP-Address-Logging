@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- Added a real `EmailNotifier` (`notifications/email.py`), replacing the `send_email_placeholder` stub that had returned `False` unconditionally since 1.0.0. SMTP-based, defaults to STARTTLS on port 587 (`smtp_use_ssl: true` switches to implicit TLS, typically port 465). Fails closed (logs a warning, returns `False`, never raises) on a misconfigured-but-enabled notifier or a connection/auth failure - matches how `TelegramNotifier` and the router collectors already fail. `run_once()` now sends to both Telegram and email (independently enabled/disabled) on the same triggers. Added `tests/test_email.py` (6 tests, `smtplib` fully mocked - no real SMTP connection is ever attempted).
+- Added `email` to `config/loader.py`'s required config sections, alongside `storage`, `telegram`, and `router`.
 - Added `auditlogger/collector/router/` provider package: `RouterProvider` abstract interface, `RouterConnection` connection parameters, `RouterClient` shared HTTP session handling, and `AutoDetectionProvider` (current default, not yet implemented).
 - Added a router orchestrator (`collect_router_info`) that selects a provider from `config["router"]["detection"]["type"]` and delegates collection to it.
 - Added an optional `network.router` field to audit events, populated only when the router collector returns data.

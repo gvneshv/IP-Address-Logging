@@ -8,6 +8,16 @@ telegram:
   bot_token: ""
   chat_id: ""
 
+email:
+  enabled: false
+  smtp_host: ""
+  smtp_port: 587
+  smtp_use_ssl: false  # false (default) = STARTTLS on 587; true = implicit TLS, typically port 465
+  username: ""
+  password: ""
+  from_address: ""
+  to_address: ""
+
 notifications:
   notify_on:
     wan_change: true          # default - WAN reconnects/lease renewals more often than the external IP itself

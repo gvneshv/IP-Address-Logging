@@ -59,13 +59,14 @@ class LoadConfigErrorTests(unittest.TestCase):
         message = str(context.exception)
         self.assertIn("router", message)
         self.assertIn("telegram", message)
+        self.assertIn("email", message)
 
     def test_missing_required_key_within_present_section_raises_config_error(self) -> None:
         """A present-but-incomplete section (storage without log_file) should also be caught."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             config_path = Path(tmp_dir) / "config.yaml"
             config_path.write_text(
-                "storage:\n  archive_dir: logs/archive\ntelegram:\n  enabled: false\nrouter:\n  enabled: false\n",
+                "storage:\n  archive_dir: logs/archive\ntelegram:\n  enabled: false\nemail:\n  enabled: false\nrouter:\n  enabled: false\n",
                 encoding="utf-8",
             )
 
@@ -79,7 +80,7 @@ class LoadConfigErrorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             config_path = Path(tmp_dir) / "config.yaml"
             config_path.write_text(
-                "storage:\n  log_file: logs/audit.jsonl\ntelegram:\n  enabled: false\nrouter:\n  enabled: false\n",
+                "storage:\n  log_file: logs/audit.jsonl\ntelegram:\n  enabled: false\nemail:\n  enabled: false\nrouter:\n  enabled: false\n",
                 encoding="utf-8",
             )
 

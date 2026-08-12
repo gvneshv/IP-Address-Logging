@@ -12,6 +12,7 @@ DEFAULT_CONFIG_PATH = Path(__file__).with_name("config.yaml")
 _REQUIRED_SECTIONS: dict[str, tuple[str, ...]] = {
     "storage": ("log_file",),
     "telegram": (),
+    "email": (),
     "router": (),
 }
 

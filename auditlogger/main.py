@@ -9,6 +9,7 @@ from auditlogger.collector.system import collect_system_info
 from auditlogger.collector.timecheck import local_now_iso, utc_now_iso
 from auditlogger.config.loader import ConfigError, load_config
 from auditlogger.logging_config import configure_logging
+from auditlogger.notifications.email import EmailNotifier
 from auditlogger.notifications.telegram import TelegramNotifier
 from auditlogger.storage.hashchain import build_hashed_event
 from auditlogger.storage.json_logger import JsonLogger
@@ -32,7 +33,8 @@ def _detect_notifiable_changes(
     """Return (label, previous_value, current_value) for changes enabled in config.
 
     wan_change is the only trigger enabled by default when notifications_config["notify_on"] omits it - the WAN interface
-    (reconnects, lease renewals, PPPoE re-auth) changes far more often than the external IP a router happens to be assigned, so it's the more useful default signal.Every other trigger (external_ip_change, conn_type_change, wan_mac_change, dns_change) defaults to disabled and must be explicitly opted into.
+    (reconnects, lease renewals, PPPoE re-auth) changes far more often than the external IP a router happens to be assigned, so it's the more useful default signal
+    Every other trigger (external_ip_change, conn_type_change, wan_mac_change, dns_change) defaults to disabled and must be explicitly opted into.
     A change only counts when both a previous and current value exist and differ - a field appearing for the first time
     (e.g. router data starting to populate once a real provider lands) is not treated as a "change".
     """
@@ -111,11 +113,13 @@ def run_once(config_path: str | Path | None = None) -> dict:
     )
 
     if changes:
-        notifier = TelegramNotifier.from_config(config["telegram"])
         message_lines = ["AuditLogger: change detected"]
         message_lines += [f"{label}: {previous} -> {current}" for label, previous, current in changes]
         message_lines.append(f"Event hash: {hashed_event['hash']}")
-        notifier.send_message("\n".join(message_lines))
+        message = "\n".join(message_lines)
+
+        TelegramNotifier.from_config(config["telegram"]).send_message(message)
+        EmailNotifier.from_config(config["email"]).send_message("AuditLogger: change detected", message)
 
     return hashed_event
 
@@ -123,9 +127,8 @@ def run_once(config_path: str | Path | None = None) -> dict:
 def main() -> None:
     """Run the command-line entry point and print the stored event hash and capabilities.
 
-    Configuration problems (missing config file, missing required sections, invalid YAML)
-    are caught here and reported as a one-line message on stderr instead of a full traceback - for the person running this,
-    a bad config is a setup step to fix, not a bug to debug.
+    Configuration problems (missing config file, missing required sections, invalid YAML) are caught here
+    and reported as a one-line message on stderr instead of a full traceback - for the person running this, a bad config is a setup step to fix, not a bug to debug.
     Any other exception still propagates normally, since it likely does indicate a real bug worth seeing the traceback for.
     """
     try:
