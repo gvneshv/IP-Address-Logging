@@ -220,8 +220,9 @@ Router-specific implementations should remain isolated under their own package, 
     connection.py # RouterConnection - connection/credential parameters
     client.py      # RouterClient - shared HTTP session handling (requests-based)
     detection.py  # AutoDetectionProvider - fallback default, returns {} (not yet implemented)
-    tplink.py     # TplinkProvider - wraps the tplinkrouterc6u library
-    tplink_ax72.py # TplinkRouterAX72 - firmware-specific signature-scheme override for tplink.py
+    tplink.py     # TplinkProvider - wraps tplinkrouterc6u's own auto-detection (get_client());
+                  #   no vendor/firmware-variant special-casing lives here - see CHANGELOG for why an earlier bespoke AX72 override was added,
+                  #   then removed once upstream covered it
     __init__.py   # collect_router_info() - orchestrator; selects a provider from
                   #   config["router"]["detection"]["type"] and delegates to it
     mikrotik.py   # future vendor providers follow the same RouterProvider interface

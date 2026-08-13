@@ -185,8 +185,7 @@ IP Address Logging/
 │     │   │   ├── connection.py # RouterConnection - connection/credential parameters
 │     │   │   ├── client.py     # RouterClient - shared HTTP session handling
 │     │   │   ├── detection.py  # AutoDetectionProvider - current default (stub)
-│     │   │   ├── tplink.py     # TplinkProvider - wraps tplinkrouterc6u, AX72 fix first
-│     │   │   └── tplink_ax72.py # TplinkRouterAX72 - nested RSA-OAEP signature fix
+│     │   │   └── tplink.py     # TplinkProvider - wraps tplinkrouterc6u's auto-detection
 │     │   ├── system.py       # Hostname, platform, boot time
 │     │   └── timecheck.py    # UTC and local timestamps
 │     ├── config/
@@ -208,16 +207,13 @@ IP Address Logging/
 │   └── refactoring-roadmap.md
 ├── logs/ # gitignored
 ├── tests/
-│     ├── live_status_test.py
 │     ├── test_capabilities.py
 │     ├── test_email.py
 │     ├── test_notification_triggers.py
 │     ├── test_event.py
 │     ├── test_loader.py
 │     ├── test_network.py
-│     ├── test_router.py
-│     ├── test_signature.py     # manual - offline AX72 signature/chunking checker
-│     └── live_login_test.py    # manual - live end-to-end AX72 login smoke test
+│     └── test_router.py
 ├── .gitignore
 ├──CHANGELOG.md
 ├──poetry.lock
