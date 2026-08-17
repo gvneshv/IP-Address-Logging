@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from ...config.loader import ConfigError
 from .connection import RouterConnection
 from .detection import AutoDetectionProvider
+from .mikrotik import MikrotikProvider
 from .tplink import TplinkProvider
 
 
@@ -37,10 +39,24 @@ def _select_provider(router_config: dict[str, Any]):
                 _build_connection(router_config),
                 include_device_list=bool(router_config.get("include_device_list", False)),
             )
+        case "mikrotik":
+            # wan_interface is required, unlike TP-Link's connection: RouterOS has no fixed WAN port,
+            # so which interface is "WAN" can't be auto-detected and must be named explicitly - see MikrotikProvider's docstring.
+            wan_interface = router_config.get("wan_interface")
+            if not wan_interface:
+                raise ConfigError(
+                    "router.detection.type is 'mikrotik' but router.wan_interface is not set - "
+                    "name the RouterOS interface (e.g. \"ether1\") that carries the WAN address."
+                )
+            return MikrotikProvider(
+                _build_connection(router_config),
+                wan_interface=wan_interface,
+                include_device_list=bool(router_config.get("include_device_list", False)),
+            )
         case "auto":
             return AutoDetectionProvider()
         case _:
-            # Vendor-specific providers (mikrotik, asus, keenetic, ...) will be added as new cases here once implemented.
+            # Vendor-specific providers (asus, keenetic, ...) will be added as new cases here once implemented.
             # Unknown/unsupported types fall back to auto-detection rather than failing outright.
             return AutoDetectionProvider()
 
