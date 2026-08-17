@@ -34,13 +34,14 @@ router:
   enabled: true
   include_device_list: false  # per-device MAC/hostname/IP for every connected client - off by default (privacy)
   connection:
-    address: "http://192.168.0.1"   # your router's actual admin URL
+    address: "http://192.168.0.1"   # TP-Link: your router's admin URL. MikroTik: bare host/IP, no scheme (e.g. "192.168.0.1") - it connects over the RouterOS API port, not HTTP.
     username: "admin"
     password: "YOUR_ADMIN_PASSWORD"  # the router admin login, not the WiFi password
     timeout: 30
-    verify_tls: false
+    verify_tls: false  # MikroTik: false = plain RouterOS API on port 8728, true = API-SSL on port 8729 (untested - see MikrotikProvider docstring)
   detection:
-    type: "tplink"
+    type: "tplink"  # or "mikrotik"
+  wan_interface: "ether1"  # MikroTik only, required for detection.type: "mikrotik" - the RouterOS interface name that carries the WAN address. RouterOS has no fixed WAN port like TP-Link hardware does, so this can't be auto-detected.
 
 logging:
   level: INFO
