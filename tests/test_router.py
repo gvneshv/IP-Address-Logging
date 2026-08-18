@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from auditlogger.collector.router import collect_router_info
+from auditlogger.config.loader import ConfigError
 
 
 class RouterOrchestrationTests(unittest.TestCase):
@@ -74,6 +75,115 @@ class RouterOrchestrationTests(unittest.TestCase):
                 "detection": {"type": "tplink"},
                 "connection": {
                     "address": "http://192.168.0.1",
+                    "username": "admin",
+                    "password": "secret",
+                    "timeout": 30,
+                    "verify_tls": False,
+                },
+            }
+        )
+
+        _, kwargs = mock_provider_class.call_args
+        self.assertFalse(kwargs["include_device_list"])
+
+    @patch("auditlogger.collector.router.MikrotikProvider.collect", return_value={"wan_ip": "203.0.113.9"})
+    def test_enabled_mikrotik_detection_delegates_to_provider(self, _mock_collect) -> None:
+        """An enabled mikrotik config should build a connection and return the provider's data."""
+        result = collect_router_info(
+            {
+                "enabled": True,
+                "detection": {"type": "mikrotik"},
+                "wan_interface": "ether1",
+                "connection": {
+                    "address": "192.168.0.2",
+                    "username": "admin",
+                    "password": "secret",
+                    "timeout": 30,
+                    "verify_tls": False,
+                },
+            }
+        )
+
+        self.assertEqual(result, {"wan_ip": "203.0.113.9"})
+
+    def test_mikrotik_missing_wan_interface_raises_config_error(self) -> None:
+        """mikrotik has no fixed WAN port to auto-detect, unlike tplink - omitting
+        wan_interface should raise ConfigError rather than silently collecting nothing or crashing deep inside the provider.
+        """
+        with self.assertRaises(ConfigError):
+            collect_router_info(
+                {
+                    "enabled": True,
+                    "detection": {"type": "mikrotik"},
+                    "connection": {
+                        "address": "192.168.0.2",
+                        "username": "admin",
+                        "password": "secret",
+                        "timeout": 30,
+                        "verify_tls": False,
+                    },
+                }
+            )
+
+    @patch("auditlogger.collector.router.MikrotikProvider")
+    def test_wan_interface_reaches_mikrotik_provider(self, mock_provider_class) -> None:
+        """router.wan_interface should be forwarded to MikrotikProvider's constructor unchanged."""
+        mock_provider_class.return_value.collect.return_value = {}
+
+        collect_router_info(
+            {
+                "enabled": True,
+                "detection": {"type": "mikrotik"},
+                "wan_interface": "ether1",
+                "connection": {
+                    "address": "192.168.0.2",
+                    "username": "admin",
+                    "password": "secret",
+                    "timeout": 30,
+                    "verify_tls": False,
+                },
+            }
+        )
+
+        _, kwargs = mock_provider_class.call_args
+        self.assertEqual(kwargs["wan_interface"], "ether1")
+
+    @patch("auditlogger.collector.router.MikrotikProvider")
+    def test_include_device_list_reaches_mikrotik_provider(self, mock_provider_class) -> None:
+        """router.include_device_list should be forwarded to MikrotikProvider's constructor unchanged."""
+        mock_provider_class.return_value.collect.return_value = {}
+
+        collect_router_info(
+            {
+                "enabled": True,
+                "detection": {"type": "mikrotik"},
+                "wan_interface": "ether1",
+                "include_device_list": True,
+                "connection": {
+                    "address": "192.168.0.2",
+                    "username": "admin",
+                    "password": "secret",
+                    "timeout": 30,
+                    "verify_tls": False,
+                },
+            }
+        )
+
+        _, kwargs = mock_provider_class.call_args
+        self.assertTrue(kwargs["include_device_list"])
+
+    @patch("auditlogger.collector.router.MikrotikProvider")
+    def test_include_device_list_defaults_false_for_mikrotik(self, mock_provider_class) -> None:
+        """Omitting include_device_list for mikrotik should default to False, matching tplink's behavior."""
+        mock_provider_class.return_value.collect.return_value = {}
+
+        collect_router_info(
+            {
+                "enabled": True,
+                "detection": {"type": "mikrotik"},
+                "wan_interface": "ether1",
+                "connection": {
+                    "address": "192.168.0.2",
                     "username": "admin",
                     "password": "secret",
                     "timeout": 30,
