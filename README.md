@@ -14,7 +14,7 @@ AuditLogger is a Windows-focused Python audit utility that records network and s
 - Adds SHA256 hashes to each stored event
 - Links each event to the previous event hash
 - Sends Telegram and/or email notifications on configurable triggers (WAN change by default; external IP, WAN connection type, WAN MAC, and DNS changes are opt-in) - see Configuration below
-- Router/WAN data collection via the TP-Link admin panel: WAN IP, WAN MAC, connection type (static/dynamic), gateway, primary/secondary DNS, WAN uptime, firmware/hardware version and model, and connected-client count
+- Router/WAN data collection via the TP-Link admin panel or MikroTik's RouterOS API: WAN IP, WAN MAC, connection type (static/dynamic), gateway, primary/secondary DNS, WAN uptime (TP-Link only - see Router Configuration below), firmware/hardware version and model, and connected-client count
 - Optional per-device list (MAC/hostname/IP of every connected client) - off by default, since it's more identifying data than the rest of what this tool collects; see Configuration below
 
 ## Requirements
@@ -22,6 +22,7 @@ AuditLogger is a Windows-focused Python audit utility that records network and s
 - Windows
 - Python 3.11 or newer
 - [`requests`](https://pypi.org/project/requests/) (used by the router HTTP client for router admin-panel communication)
+- [`librouteros`](https://pypi.org/project/librouteros/) (only needed if `router.detection.type` is `mikrotik` - speaks the RouterOS API directly, not HTTP)
 - Optional: Telegram bot token and chat ID, and/or SMTP credentials, for notifications
 
 ## Installation
@@ -110,6 +111,31 @@ router:
 
 `connected_clients_total` (a count, no per-device identity) is always collected when the router is enabled. The full device list - each connected device's MAC address, hostname, and IP - is only collected when `include_device_list` is explicitly set to `true`, since it identifies every device on your network, not just the router's own WAN state. Turn it on only if you actually want that level of detail in your logs.
 
+### MikroTik support
+
+```yaml
+router:
+  enabled: true
+  detection:
+    type: "mikrotik"
+  wan_interface: "ether1"  # required - see below
+  connection:
+    address: "192.168.0.1"  # bare host/IP, no scheme - MikroTik connects over the RouterOS API, not HTTP
+    username: "admin"
+    password: "YOUR_ADMIN_PASSWORD"
+    timeout: 30
+    verify_tls: false  # false = plain API on port 8728, true = API-SSL on port 8729
+```
+
+Unlike TP-Link hardware, RouterOS has no fixed WAN port - any interface can serve that role depending on how the router is configured, so it can't be auto-detected and must be named explicitly via `wan_interface`.
+
+Before using this, make sure the RouterOS API service is enabled: **IP -> Services -> `api`** in WebFig/Winbox (port 8728 by default). It's often on by default, but worth checking.
+
+Known limitations:
+- `wan_uptime_seconds` is always `None` for MikroTik - RouterOS doesn't expose a "time since WAN connected" counter for a plain interface the way TP-Link's library does.
+- If `wan_interface` isn't actually routing WAN traffic (no default route, no active DHCP client on it - e.g. the router is running as a bridge/switch rather than a NAT gateway), `conn_type`, `gateway`, `dns_primary`, and `dns_secondary` will all come back `None` rather than a guessed value.
+- The DHCP-client-assigned WAN path (`conn_type: "dhcp"`) has not yet been verified against a live DHCP-client lease, only against a static-address setup and a bridge-mode device - both against real hardware.
+
 ## Usage
 
 Run one audit event manually:
@@ -185,6 +211,7 @@ IP Address Logging/
 │     │   │   ├── connection.py # RouterConnection - connection/credential parameters
 │     │   │   ├── client.py     # RouterClient - shared HTTP session handling
 │     │   │   ├── detection.py  # AutoDetectionProvider - current default (stub)
+│     │   │   ├── mikrotik.py   # MikrotikProvider - RouterOS API via librouteros
 │     │   │   └── tplink.py     # TplinkProvider - wraps tplinkrouterc6u's auto-detection
 │     │   ├── system.py       # Hostname, platform, boot time
 │     │   └── timecheck.py    # UTC and local timestamps
